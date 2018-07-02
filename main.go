@@ -41,13 +41,16 @@ func (hook ContextHook) Fire(entry *log.Entry) error {
 }
 
 const (
-	Name    string = "storageserver"
+	// Name means the programe name
+	Name string = "storageserver"
+	// Version means the version
 	Version string = "1.0"
-	logFile string = "storageserver.log"
+	// LogFile is the file to write
+	LogFile string = "storageserver.log"
 )
 
 func init() {
-	f, err := os.OpenFile(logFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	f, err := os.OpenFile(LogFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	//设置输出样式，自带的只有两种样式logrus.JSONFormatter{}和logrus.TextFormatter{}
 	log.SetFormatter(&log.TextFormatter{})
 	//设置output,默认为stderr,可以为任何io.Writer，比如文件*os.File
