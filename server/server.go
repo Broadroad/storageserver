@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"bufio"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -47,7 +49,19 @@ func (s *Server) listen() {
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 	log.Info("Connection come from " + conn.RemoteAddr().String())
-	conn.Write([]byte("HTTP/1.1 200 OK\n"))
+	reader := bufio.NewReader(conn)
+	for {
+		message, err := reader.ReadString('\n')
+		if err != nil {
+			conn.Close()
+			return
+		}
+		fmt.Println(message)
+		log.WithFields(log.Fields{
+			"message":    message,
+		}).Info("get message")
+		conn.Write([]byte("HTTP/1.1 200 OK\n"))	
+	}
 }
 
 // interruptHandler handle signal when server close
@@ -57,7 +71,9 @@ func interruptHandler() {
 	signal.Notify(c, syscall.SIGTERM)
 	go func() {
 		sig := <-c
-		log.Printf("captured %v, stopping profiler and exiting..", sig)
+		log.WithFields(log.Fields{
+			"sig":    sig,
+		}).Info("stopping profiler and exiting...")	
 		os.Exit(1)
 	}()
 }

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-	server "github.com/storagserver/server"
+	server "github.com/storageserver/server"
 )
 
 // ContextHook is a hook for logrus.
@@ -24,18 +24,24 @@ func (hook ContextHook) Levels() []log.Level {
 // Fire helps logrus record the related file, function and line.
 func (hook ContextHook) Fire(entry *log.Entry) error {
 	pc := make([]uintptr, 3, 3)
-	cnt := runtime.Callers(1, pc)
+	cnt := runtime.Callers(6, pc)
 
 	for i := 0; i < cnt; i++ {
 		fu := runtime.FuncForPC(pc[i] - 1)
-		fmt.Println(fu.Name())
 		name := fu.Name()
-		if !strings.Contains(name, "github.com/Sirupsen/log") {
+		if !strings.Contains(name, "github.com/sirupsen/log") {
 			file, line := fu.FileLine(pc[i] - 1)
 			entry.Data["file"] = path.Base(file)
 			entry.Data["func"] = path.Base(name)
 			entry.Data["line"] = line
 			break
+		} else {
+			if pc, file, line, ok := runtime.Caller(8); ok {
+				funcName := runtime.FuncForPC(pc).Name()
+				entry.Data["file"] = path.Base(file)
+				entry.Data["func"] = path.Base(funcName)
+				entry.Data["line"] = line
+			}
 		}
 	}
 	return nil
