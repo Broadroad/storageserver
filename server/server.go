@@ -1,7 +1,6 @@
 package server
 
 import (
-	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -18,17 +17,16 @@ type Server struct {
 }
 
 // NewServer return a new server
-func NewServer() *Server {
-	return &Server{}
+func NewServer(address string) *Server {
+	return &Server{address: address}
 }
 
 // Run start the server
-func (this *Server) Run() {
+func (s *Server) Run() {
 	log.Info("Server is starting...")
 	// init server
 	interruptHandler()
-
-	this.listen()
+	s.listen()
 }
 
 // listen accept connection
@@ -48,13 +46,7 @@ func (s *Server) listen() {
 // handleConnection really handle connection
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	b := make([]byte, 100)
-	for {
-		_, err := conn.Read(b)
-		if err == io.EOF {
-			break
-		}
-	}
+	log.Info("Connection come from " + conn.RemoteAddr().String())
 	conn.Write([]byte("HTTP/1.1 200 OK\n"))
 }
 

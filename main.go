@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	server "github.com/storagserver/server"
 )
 
 // ContextHook is a hook for logrus.
@@ -84,6 +85,8 @@ func MaxParallelism() int {
 
 func Start() {
 	//TODO Start Storage Server
+	s := server.NewServer("127.0.0.1:8080")
+	s.Run()
 }
 
 func main() {
