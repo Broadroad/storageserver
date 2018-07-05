@@ -1,0 +1,364 @@
+package storageserver;
+
+option java_package = "com.emc.storageos.data.protocol.ss";
+option java_outer_classname = "StorageServerMessages";
+
+message Request {    
+    required int64 version = 1;
+    required bytes messageCheckSum = 2; //checksum of the message
+
+    optional bytes context = 3; // if included will be returned in the response
+    optional string requestId = 4; // if included will be returned in response
+    optional string origin = 5; // client side marker to track origin of request on server
+    optional uint64 timeout = 6;
+
+    extensions 1000 to max; // 19000 through 19999 are reserved
+}
+
+/*
+ * Base response message
+ * All responses are wrapped inside of this message
+ *
+ */
+message Response {
+    enum Status {
+        SUCCESS = 1; 
+        ERROR = 2;
+    }
+
+    // used for dealing with changes in protocol messages
+    required int64 version = 1;
+
+    // Used generically for success/failure of request. Additional information
+    // may be provided by the errorMessage field and child response message may have additional
+    // states/messages
+    required Response.Status status = 2;
+
+    required bytes messageCheckSum = 3;
+
+    // Used generically
+    optional string errorMessage = 4;
+
+    //If included will be returned in the response
+    optional bytes context = 5;
+    optional string requestId = 6;
+
+    extensions 1000 to max; // 19000 through 19999 are reserved
+}
+
+
+// New types of requests are added to the Request
+extend Request {
+     optional WriteRequest writeRequest = 1000;
+     optional ReadRequest readRequest = 1001;
+     optional VerifyDataRequest verifyRequest = 1002;
+     optional ConfigurationRequest configRequest = 1003;
+     optional StatusRequest statusRequest = 1004;
+     optional CopyFromRequest copyFromRequest = 1005;
+     optional SyncBlockBinRequest syncBlockBinRequest = 1006;
+     optional EventRequest eventRequest = 1007;
+     optional ConnectionPoolRequest connectionPoolRequest = 1008;
+     optional MgmtRequest mgmtRequest = 1009;
+     optional PingRequest pingRequest = 1010;
+}
+
+// New types of responses are added to the Response
+extend Response {
+    optional WriteResponse writeResponse = 1000;
+    optional ReadResponse readResponse = 1001;
+    optional VerifyDataResponse verifyResponse = 1002;
+    optional ConfigurationResponse configResponse = 1003;
+    optional StatusResponse statusResponse = 1004;
+    optional CopyFromResponse copyFromResponse = 1005;
+    optional SyncBlockBinResponse syncBlockBinResponse = 1006;
+    optional ConnectionPoolResponse connectionPoolResponse = 1007;
+    optional MgmtResponse mgmtResponse = 1008;
+    optional PingResponse pingResponse = 1009;
+}
+
+message RequestMetadata {
+    optional uint32 chunkSize = 1;
+    optional uint64 chunkOffset = 2;
+    optional bool shouldCache = 3;
+}
+
+/*
+ * Calls datasync on the specified file
+ * Used when WriteRequest sets syncOnWrite = false as a final step
+ * to ensure data was written fully to disk
+ */
+message SyncBlockBinRequest {
+    required string partitionUuid = 1;
+    required string fileName = 2;
+
+    optional RequestMetadata metadata = 3;
+}
+
+// used to help identify response of SyncBlockBinRequest
+message SyncBlockBinResponse {
+    required string serverStartTime = 1;
+}
+
+/*
+ * Writes a block of data to the specified location
+ */
+message WriteRequest {
+    required string partitionUuid = 1;
+    required string fileName = 2;
+    required int64 startingOffset = 3;
+    required int64 dataLength = 4;
+    optional bool syncOnWrite = 5 [default = true];
+
+    // if present will compare against checksum calculated by server
+    // if checksums do not match an error will be returned
+    // calculated checksum in response will always be returned regardless
+    optional bytes dataCheckSum = 6;
+
+    // if present and true, storage server will not write data to the disk
+    // this flag is only used for testing storage server
+    optional bool skipWrite = 7 [default = false];
+
+    optional RequestMetadata metadata = 8;
+}
+
+message WriteResponse {
+
+    //Hash of the data written so the client can
+    //verify if the data was correct or not and take
+    //the appropriate action.
+    optional bytes dataCheckSum = 1;
+
+    // if syncOnWrite = false, returns start time of
+    // server to know if a reset happened between the call
+    // to write and the call to sync to disk
+    optional string serverStartTime = 2;
+}
+
+/*
+ * Read the requested block
+ */
+message ReadRequest {
+    required string partitionUuid = 1;
+    required string fileName = 2;
+    required int64 startingOffset = 3;
+    required int64 dataLength = 4;
+
+    optional RequestMetadata metadata = 5;
+}
+
+message ReadResponse {
+    required int64 dataLength = 1;
+}
+
+/* calculates a checksum based on the data provided and
+ * returns it in the response
+ */
+message VerifyDataRequest {
+    required string partitionUuid = 1;
+    required string fileName = 2;
+    required int64 startingOffset = 3;
+    required int64 dataLength = 4;
+}
+
+message VerifyDataResponse {
+    required bytes dataCheckSum = 1; //Hash of the data verified so the client can
+                                     //verify if the data was correct or not and take
+                                     //the appropriate action.
+}
+
+// pull request from another storage server
+message CopyFromRequest {
+    // server to connect to - host:port
+    required string sourceServerName = 1;
+    required string soucePartitionUuid = 2;
+    required string sourceFileName = 3;
+    required string sourceStartingOffset = 4;
+    required string partitionUuid = 5;
+    required string fileName = 6;
+    required string startingOffset = 7;
+    required string dataLength = 8;
+}
+
+message CopyFromResponse {
+    optional bytes dataCheckSum = 1;
+}
+
+message SetConfigurationRequest {
+
+    // change id
+    optional string storageServerId = 1;
+    // change default blockbin byte size
+    optional int64 defaultBlockBinSizeBytes = 2;
+}
+
+message SetConfigurationResponse {
+  required Configuration configuration = 1;
+}
+
+message ConfigurationRequest {
+    repeated ConfigurationRequestForSSD ssdConfigurationRequest = 1;
+    optional int32 level = 2;
+    optional int32 highestLevel = 3;
+}
+
+message ConfigurationRequestForSSD {
+    required string ssdId = 1;
+    required bool requestInvalidatedCache = 2;
+    optional Locations notifiedLocations = 3;
+    optional Location token = 4;
+}
+
+message ConfigurationResponse {
+    required Configuration configuration = 1;
+}
+
+message Configuration {
+    required string storageServerId = 1;
+    required bool syslogEnabled = 2;
+    required string syslogFlags = 3;
+    required int64 defaultBlockBinSizeBytes = 4;
+    required Status status = 5;
+    repeated PartitionInfo partition = 6;
+}
+
+message Location {
+    required string partitionId = 1;
+    required string blockBinId = 2;
+    required int64 offset = 3;
+    required int64 size = 4;
+}
+
+message Locations {
+    repeated Location location = 1;
+}
+
+message PartitionInfo {
+
+    enum PartitionState {
+        UNKNOWN = 0;
+        ONLINE = 1;
+        OFFLINE = 2;
+        ERROR = 3; // Partition may be online but in an degraded state or starting to fail
+        REMOVED = 4;
+        MAINTENANCE = 5;
+    }
+
+    message BlockBinInfo {
+        enum BlockBinState {
+            ONLINE = 1;
+            ERROR = 2;
+        }
+        required string id = 1;
+        required int64 size = 2;
+        required BlockBinState state = 3;
+        optional string errorMessage = 4;
+    }
+
+    required string uuid = 1;
+    required string path = 2;
+    required PartitionState state = 3;
+    optional string errorMessage = 4;
+
+    required int64 sizeBytes = 5;
+    required int64 availableBytes = 6;
+
+    repeated BlockBinInfo blockBinInfo = 7;
+    optional string serialNumber = 8;
+    optional string slot = 9;
+    optional string device = 10;
+    optional bool isSSD = 11;
+    optional Locations locations = 12;
+}
+
+message StatusRequest {
+}
+
+message StatusResponse {
+    required string storageServerId = 1;
+    required Status status = 2;
+    required int64 changeId = 3;
+}
+message Status {
+    required string serverStartTime = 1;
+    required int64 requestCount = 2; // number of requests
+    required int64 requestErrorCount = 3; // number of requests that encountered an error
+    required int64 partitionCount = 4;  //the number of partitions currently active.
+    required int64 partitionError = 5;  //The number of partitions currently in an error state.
+}
+
+message PingRequest {
+}
+
+message IOStats {
+    required uint64 averageReadRequestTime = 1;      // average time of read requests execution, mcs
+    required uint64 averageWriteRequestTime = 2;     // average time of write requests execution, mcs
+    required uint64 estimatedReadRequestTime = 3;    // estimated time for future read requests execution, mcs
+    required uint64 estimatedWriteRequestTime = 4;   // estimated time for future write requests execution, mcs
+    required uint64 readOperations = 5;              // number of pread sys calls
+    required uint64 writeOperations = 6;             // number of pwrite sys calls
+    required uint64 averageReadTime = 7;             // average time spent for data reading (pread), mcs
+    required uint64 averageWriteTime = 8;            // average time spent for data writing (pwrite), mcs
+}
+
+message PartitionStats {
+    required string uuid = 1;
+    required IOStats stats = 2;
+}
+
+message PingResponse {
+    repeated PartitionStats partitionStats = 1;
+}
+
+
+//
+// If we decide to do outbound events from the storage server
+// Would have to decide how we want to register to receive events
+//
+
+
+
+message Event {
+    enum Severity {
+        INFORMATIONAL = 1;
+        CLEAR = 2;
+        WARNING = 3;
+        MINOR = 4;
+        MAJOR = 5;
+        CRITICAL = 6;
+    }
+
+    required int64 eventId = 1;
+    required int64 eventMessage = 2;
+    required string dateTime = 3;
+    required Severity severity = 4;
+}
+
+message EventRequest {
+    required string storageServerId = 1;
+    required Event event = 2;
+}
+
+message ConnectionPoolRequest {
+    required string poolId = 1; 
+}
+
+message ConnectionPoolResponse {
+}
+
+message Entry{
+        required string key = 1;
+        required string value = 2;
+}
+
+message MgmtRequest{
+    required string cmd = 1;
+    repeated Entry parameters = 2;
+}
+
+message MgmtResponse{
+    repeated Entry results = 1;
+}
+
+
+
+
