@@ -9,6 +9,9 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/golang/protobuf/proto"
+	"github.com/storageserver/protocolbuffer"
+
 	log "github.com/sirupsen/logrus"
 	server "github.com/storageserver/server"
 )
@@ -105,7 +108,10 @@ func main() {
 		"Version": Version,
 	}).Info("test")
 
+	// TODO just for test proto, will rm then
+	request := &protocolbuffer.Request{
+		Origin: proto.String("hello"),
+	}
+	fmt.Println(request.String())
 	Start()
-	//s := ss.NewSS()
-	//s.Setup(2, 2)
 }
