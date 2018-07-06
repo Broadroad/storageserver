@@ -1,14 +1,22 @@
 package server
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
-	"bufio"
-	"fmt"
 
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	// BUFFERSIZE define the read or write buffer size
+	BUFFERSIZE = 2 * 1024 * 1024
 )
 
 // Server control all this app
@@ -49,18 +57,40 @@ func (s *Server) listen() {
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 	log.Info("Connection come from " + conn.RemoteAddr().String())
+	//buffer := new(bytes.Buffer)
 	reader := bufio.NewReader(conn)
+	data := make([]byte, 0, BUFFERSIZE)
 	for {
-		message, err := reader.ReadString('\n')
+		i := 1
+		for i <= 5 {
+			n, err := io.ReadFull(reader, data[:i])
+			buf := bytes.NewBuffer(data)
+			i = i + 1
+			dataLen, _ := binary.ReadVarint(buf)
+		}
+
+		n, err := io.ReadFull(reader, data[:5])
+		data = data[:n]
+		if err != nil {
+			if err != io.EOF {
+				break
+			}
+		}
+
+		dataLen := binary.BigEndian.Uint32(data)
+
+		n, err = io.ReadFull(reader, data[:dataLen])
+
 		if err != nil {
 			conn.Close()
 			return
 		}
+		message := "test"
 		fmt.Println(message)
 		log.WithFields(log.Fields{
-			"message":    message,
+			"message": message,
 		}).Info("get message")
-		conn.Write([]byte("HTTP/1.1 200 OK\n"))	
+		conn.Write([]byte("HTTP/1.1 200 OK\n"))
 	}
 }
 
@@ -72,8 +102,8 @@ func interruptHandler() {
 	go func() {
 		sig := <-c
 		log.WithFields(log.Fields{
-			"sig":    sig,
-		}).Info("stopping profiler and exiting...")	
+			"sig": sig,
+		}).Info("stopping profiler and exiting...")
 		os.Exit(1)
 	}()
 }
