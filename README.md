@@ -1,3 +1,7 @@
+<h1 align=center>
+<img src="logo/512 horizontal.svg" width=60%>
+</h1>
+
 # The StorageServer in go
 
 ## Description
